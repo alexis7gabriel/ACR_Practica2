@@ -16,7 +16,7 @@ import javax.swing.JFileChooser;
  * @author cesar
  */
 public class Cliente {
-    private static int TAMANO_VENTANA = 10; // Tamaño de la ventana predeterminado
+    private static int TAMANO_VENTANA = 5; // Tamaño de la ventana predeterminado
     private static final int TIMEOUT = 3000; // 3 segundos de timeout
     public static void main(String[] args) {
     
@@ -29,6 +29,8 @@ public class Cliente {
             byte[] bs = new byte [1028];
           
             DatagramSocket cl = new DatagramSocket();
+            System.out.println("size:" + cl.getSendBufferSize() + "\n");
+            cl.setReuseAddress(true);
             
             while (true){
                 // Selección de archivo
@@ -52,9 +54,9 @@ public class Cliente {
                     int base = 0;
                     int siguienteSecuencia = 0;
 
-                    while (base < totalPaquetes) {
+                    while (siguienteSecuencia < totalPaquetes) {
                         // Envío de paquetes en la ventana actual
-                        for (int i = base; i < (totalPaquetes); i++) {
+                        for (int i = base; i < Math.min(base + TAMANO_VENTANA, totalPaquetes); i++) {
                             bs = createPacketData(i, archivoSeleccionado, fis, totalPaquetes);
                             DatagramPacket paqueteEnvio = new DatagramPacket(bs, bs.length, dst, pto);
                             cl.send(paqueteEnvio);
@@ -70,20 +72,23 @@ public class Cliente {
                                 DatagramPacket paqueteRecepcion = new DatagramPacket(br, br.length);
                                 cl.receive(paqueteRecepcion);
                                 String ack = new String(paqueteRecepcion.getData(), 0, paqueteRecepcion.getLength());
+                                System.out.println("se recibio el ack: " + ack + "\n");
                                 int ackNum = Integer.parseInt(ack);
                                 if (ackNum >= base) {
-                                    base = ackNum + 1;
+                                    base = ackNum;
                                 }
+                                System.out.println("base: " + base + "\n");
                             } catch (SocketTimeoutException e) {
                                 // Timeout, retransmitir paquetes no confirmados
-                                i = base; // Retroceder para retransmitir
+                                System.out.println("entro en retroceder n \n");
+                                i = base - 1; // Retroceder para retransmitir
                             }
                         }
                     }
-
-                    fis.close();
+                    System.out.println("Archivo pasado con exito\n");
                 } else {
                     // El cliente decide no enviar más archivos
+                    //fis.close();
                     break;
                 }
             } // while
@@ -96,7 +101,7 @@ public class Cliente {
         int offset = (sequenceNumber) * 1024;
         System.out.println("salto:" + offset + "\n");
         //if(offset != 0) fis.skip(1024);
-        System.out.println("disponible:" + fis.available() + "\n");
+        //System.out.println("disponible:" + fis.available() + "\n");
         int length = 0;
         if(((sequenceNumber+1)*1024) < file.length()){
             length = 1024;

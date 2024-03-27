@@ -34,16 +34,23 @@ public class Servidor {
                 System.out.println("Nombre del archivo recibido: " + nombreArchivo);
                 // Creación del archivo de salida
                 FileOutputStream fos = new FileOutputStream(ruta + "/Archivos remotos/" + nombreArchivo);
+                int expectedSequenceNumber = 0;
                 while (true) {
-                    byte[] bufferRecepcion = new byte[65535];
+                    byte[] bufferRecepcion = new byte[200000];
                     DatagramPacket paqueteRecepcion = new DatagramPacket(bufferRecepcion, bufferRecepcion.length);
                     socketServidor.receive(paqueteRecepcion);
                     System.out.println("ack: " + extractSequenceNumber(paqueteRecepcion.getData()) + "\n");
-                    // Procesamiento del paquete
-                    processPacket(paqueteRecepcion, fos);
+                    if (extractSequenceNumber(paqueteRecepcion.getData())== expectedSequenceNumber) {
+                        // Procesamiento del paquete
+                        processPacket(paqueteRecepcion, fos);
+                        // Incrementa el número de secuencia esperado para el siguiente paquete
+                        expectedSequenceNumber++;
+                    } else {
+                        System.out.println("no se recibio el correcto \n");
+                    }
 
                     // Envío de ACK
-                    sendAck(paqueteRecepcion, socketServidor);
+                    sendAck(expectedSequenceNumber, paqueteRecepcion, socketServidor);
                 }
             }
         } catch (IOException e) {
@@ -60,18 +67,13 @@ public class Servidor {
         fos.write(data, 4, length - 4); // Excluye los primeros 4 bytes (número de secuencia)
     }
 
-    private static void sendAck(DatagramPacket packet, DatagramSocket socket) throws IOException, InterruptedException {
-        // Extracción del número de secuencia del paquete recibido
-        int seqNum = extractSequenceNumber(packet.getData());
-
-        // Envío de ACK
+    private static void sendAck(int seqNum, DatagramPacket packet, DatagramSocket socket) throws IOException {
+        // Envío de ACK para el siguiente paquete esperado
         String ack = String.valueOf(seqNum);
         byte[] bufferAck = ack.getBytes();
         DatagramPacket paqueteAck = new DatagramPacket(bufferAck, bufferAck.length,
                 packet.getAddress(), packet.getPort());
         socket.send(paqueteAck);
-        //System.out.println("Enviado ACK para paquete con secuencia: " + seqNum);
-       // Thread.sleep(1000); // Espera 1 segundo antes de continuar
     }
 
     private static int extractSequenceNumber(byte[] packetData) {
