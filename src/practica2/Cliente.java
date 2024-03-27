@@ -25,6 +25,8 @@ public class Cliente {
             String dir = "127.0.0.1";
             InetAddress dst = InetAddress.getByName(dir);
             int x = 0;
+            byte[] br = new byte [1028];
+            byte[] bs = new byte [1028];
           
             DatagramSocket cl = new DatagramSocket();
             
@@ -34,69 +36,75 @@ public class Cliente {
                 fileChooser.setDialogTitle("Seleccione un archivo");
                 int seleccion = fileChooser.showOpenDialog(null);
                 if (seleccion == JFileChooser.APPROVE_OPTION) {
-                    File f = fileChooser.getSelectedFile();
-                    FileInputStream fis = new FileInputStream(f);
-                    // Enviar nombre del archivo como primer paquete
-                    String nombreArchivo = f.getName();
-                    byte[] tmp = nombreArchivo.getBytes();
-                    DatagramPacket paqueteNombre = new DatagramPacket(tmp, tmp.length,
+                    File archivoSeleccionado = fileChooser.getSelectedFile();
+                    FileInputStream fis = new FileInputStream(archivoSeleccionado);
+
+                    // Envío del nombre del archivo como primer paquete
+                    String nombreArchivo = archivoSeleccionado.getName();
+                    DatagramPacket paqueteNombre = new DatagramPacket(nombreArchivo.getBytes(), nombreArchivo.getBytes().length,
                             dst, pto);
                     cl.send(paqueteNombre);
-                    int totalPaquetes = (int) Math.ceil((double) f.length() / TAMANO_VENTANA);
-                    System.out.println(totalPaquetes);
+
+                    int totalPaquetes = (int) Math.ceil((double) archivoSeleccionado.length() / bs.length);
+                    
+                    System.out.println("total paquetes" + totalPaquetes + "\n");
 
                     int base = 0;
                     int siguienteSecuencia = 0;
+
                     while (base < totalPaquetes) {
                         // Envío de paquetes en la ventana actual
-                        for (int i = base; i < Math.min(base + TAMANO_VENTANA, totalPaquetes); i++) {
-                            byte[] bs = createPacketData(i, f, fis);
+                        for (int i = base; i < (totalPaquetes); i++) {
+                            bs = createPacketData(i, archivoSeleccionado, fis, totalPaquetes);
                             DatagramPacket paqueteEnvio = new DatagramPacket(bs, bs.length, dst, pto);
                             cl.send(paqueteEnvio);
-                            //System.out.println("Enviado ACK para el paquete " + i);
-                            //Thread.sleep(1000); // Espera 1 segundo
                             siguienteSecuencia++;
                         }
 
                         // Configuración del temporizador para el timeout
-                        cl.setSoTimeout(3000);
+                        cl.setSoTimeout(TIMEOUT);
 
                         // Recepción de acks o retransmisión en caso de timeout
                         for (int i = base; i < siguienteSecuencia; i++) {
                             try {
-                                byte [] br = new byte [TAMANO_VENTANA];
                                 DatagramPacket paqueteRecepcion = new DatagramPacket(br, br.length);
                                 cl.receive(paqueteRecepcion);
                                 String ack = new String(paqueteRecepcion.getData(), 0, paqueteRecepcion.getLength());
                                 int ackNum = Integer.parseInt(ack);
                                 if (ackNum >= base) {
                                     base = ackNum + 1;
-                                   // System.out.println("Recibido ACK para el paquete " + ackNum);
-                                    //Thread.sleep(1000); // Espera 1 segundo
                                 }
                             } catch (SocketTimeoutException e) {
                                 // Timeout, retransmitir paquetes no confirmados
                                 i = base; // Retroceder para retransmitir
-                           }
+                            }
                         }
-                    } // while
+                    }
+
                     fis.close();
                 } else {
-                    System.out.println("Fin");
+                    // El cliente decide no enviar más archivos
                     break;
-                }  
+                }
             } // while
             cl.close();
         } catch (Exception e) {
             e.printStackTrace();
         }//catch
     }
-    private static byte[] createPacketData(int sequenceNumber, File file, FileInputStream fis) throws IOException {
-        int offset = sequenceNumber * TAMANO_VENTANA;
-        System.out.println("offset" + offset + "\n");
-        fis.skip(offset);
-        int length = Math.min(fis.available(), TAMANO_VENTANA);
-        byte[] packetData = new byte[TAMANO_VENTANA + 4];
+    private static byte[] createPacketData(int sequenceNumber, File file, FileInputStream fis, int total) throws IOException {
+        int offset = (sequenceNumber) * 1024;
+        System.out.println("salto:" + offset + "\n");
+        //if(offset != 0) fis.skip(1024);
+        System.out.println("disponible:" + fis.available() + "\n");
+        int length = 0;
+        if(((sequenceNumber+1)*1024) < file.length()){
+            length = 1024;
+        } else {
+            length = (int) file.length() % 1024;
+        }
+        System.out.println("tamm paquete a enviar:" + length + "\n");
+        byte[] packetData = new byte[length + 4];
         byte[] sequenceBytes = intToBytes(sequenceNumber);
         System.arraycopy(sequenceBytes, 0, packetData, 0, 4);
         fis.read(packetData, 4, length);

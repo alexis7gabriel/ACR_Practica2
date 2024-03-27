@@ -17,7 +17,7 @@ public class Servidor {
         try {
             int pto=1234;
             DatagramSocket socketServidor = new DatagramSocket(pto);
-            byte[] bufferRecepcion = new byte[1024];
+            //byte[] bufferRecepcion = new byte[65535];
             socketServidor.setReuseAddress(true);
             //obtencion de ruta de la raiz
             File f = new File("");
@@ -27,13 +27,15 @@ public class Servidor {
             System.out.println("Servidor iniciado... esperando datagramas..");
             while (true){
                 // Recepción del nombre del archivo
-                DatagramPacket paqueteNombreArchivo = new DatagramPacket(bufferRecepcion, bufferRecepcion.length);
+                byte[] bufferNombre = new byte[65535];
+                DatagramPacket paqueteNombreArchivo = new DatagramPacket(bufferNombre, bufferNombre.length);
                 socketServidor.receive(paqueteNombreArchivo);
                 String nombreArchivo = new String(paqueteNombreArchivo.getData(), 0, paqueteNombreArchivo.getLength());
                 System.out.println("Nombre del archivo recibido: " + nombreArchivo);
                 // Creación del archivo de salida
                 FileOutputStream fos = new FileOutputStream(ruta + "/Archivos remotos/" + nombreArchivo);
                 while (true) {
+                    byte[] bufferRecepcion = new byte[65535];
                     DatagramPacket paqueteRecepcion = new DatagramPacket(bufferRecepcion, bufferRecepcion.length);
                     socketServidor.receive(paqueteRecepcion);
                     System.out.println("ack: " + extractSequenceNumber(paqueteRecepcion.getData()) + "\n");
@@ -53,7 +55,7 @@ public class Servidor {
         // Obtener datos del paquete
         byte[] data = packet.getData();
         int length = packet.getLength();
-        
+        System.out.println("tamaño: " + length + "\n");
         // Escribir datos al archivo
         fos.write(data, 4, length - 4); // Excluye los primeros 4 bytes (número de secuencia)
     }
