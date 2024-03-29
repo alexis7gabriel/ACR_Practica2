@@ -16,7 +16,7 @@ import javax.swing.JFileChooser;
  * @author cesar
  */
 public class Cliente {
-    private static int TAMANO_VENTANA = 5; // Tamaño de la ventana predeterminado
+    private static int TAMANO_VENTANA = 60; // Tamaño de la ventana predeterminado
     private static final int TIMEOUT = 3000; // 3 segundos de timeout
     public static void main(String[] args) {
     
@@ -25,14 +25,15 @@ public class Cliente {
             String dir = "127.0.0.1";
             InetAddress dst = InetAddress.getByName(dir);
             int x = 0;
-            byte[] br = new byte [1028];
-            byte[] bs = new byte [1028];
+            
           
             DatagramSocket cl = new DatagramSocket();
             System.out.println("size:" + cl.getSendBufferSize() + "\n");
             cl.setReuseAddress(true);
             
             while (true){
+                byte[] br = new byte [1028];
+                byte[] bs = new byte [1028];
                 // Selección de archivo
                 JFileChooser fileChooser = new JFileChooser();
                 fileChooser.setDialogTitle("Seleccione un archivo");
@@ -85,10 +86,15 @@ public class Cliente {
                             }
                         }
                     }
-                    System.out.println("Archivo pasado con exito\n");
+                    System.out.println("Archivo pasado con exito\n");                    
+                    //enviar ack con -1 para indicar al servidor que se terminó
+                    bs = createPacketData(-1, archivoSeleccionado, fis, totalPaquetes);
+                    DatagramPacket paqueteEnvio = new DatagramPacket(bs, bs.length, dst, pto);
+                    cl.send(paqueteEnvio);
+                    fis.close();
+                    
                 } else {
                     // El cliente decide no enviar más archivos
-                    //fis.close();
                     break;
                 }
             } // while
@@ -102,8 +108,10 @@ public class Cliente {
         System.out.println("salto:" + offset + "\n");
         //if(offset != 0) fis.skip(1024);
         //System.out.println("disponible:" + fis.available() + "\n");
-        int length = 0;
-        if(((sequenceNumber+1)*1024) < file.length()){
+        int length;
+        if (sequenceNumber == -1 ){
+            length = 0;
+        } else if(((sequenceNumber+1)*1024) < file.length()){
             length = 1024;
         } else {
             length = (int) file.length() % 1024;

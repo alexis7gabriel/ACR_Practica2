@@ -45,8 +45,9 @@ public class Servidor {
                         processPacket(paqueteRecepcion, fos);
                         // Incrementa el número de secuencia esperado para el siguiente paquete
                         expectedSequenceNumber++;
-                    } else {
-                        System.out.println("no se recibio el correcto \n");
+                    } else if (extractSequenceNumber(paqueteRecepcion.getData())== -1){
+                        System.out.println("Fin del archivo \n");
+                        break;
                     }
 
                     // Envío de ACK
