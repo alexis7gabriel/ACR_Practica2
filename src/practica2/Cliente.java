@@ -9,6 +9,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import javax.swing.JFileChooser;
 
 /**
@@ -16,22 +17,18 @@ import javax.swing.JFileChooser;
  * @author cesar
  */
 public class Cliente {
-    private static int TAMANO_VENTANA = 60; // Tamaño de la ventana predeterminado
-    private static final int TIMEOUT = 3000; // 3 segundos de timeout
+    private static final int TIMEOUT = 300  ; // 1 segundos de timeout
     public static void main(String[] args) {
     
         try {
             int pto = 1234;
             String dir = "127.0.0.1";
             InetAddress dst = InetAddress.getByName(dir);
-            int x = 0;
-            
-          
-            DatagramSocket cl = new DatagramSocket();
-            System.out.println("size:" + cl.getSendBufferSize() + "\n");
-            cl.setReuseAddress(true);
-            
+                      
             while (true){
+                DatagramSocket cl = new DatagramSocket();
+                System.out.println("size:" + cl.getSendBufferSize() + "\n");
+                cl.setReuseAddress(true);
                 byte[] br = new byte [1028];
                 byte[] bs = new byte [1028];
                 // Selección de archivo
@@ -49,8 +46,14 @@ public class Cliente {
                     cl.send(paqueteNombre);
 
                     int totalPaquetes = (int) Math.ceil((double) archivoSeleccionado.length() / bs.length);
-                    
                     System.out.println("total paquetes" + totalPaquetes + "\n");
+                    
+                    // Generar un número aleatorio entre 0 y 1
+                    Random random = new Random();
+                    int randomValue = Math.abs(random.nextInt());
+                    int TAMANO_VENTANA = randomValue % totalPaquetes; // Tamaño de la ventana <= totalpaquetes
+                    
+                    System.out.println("Tamaño ventana: " + TAMANO_VENTANA + "\n");
 
                     int base = 0;
                     int siguienteSecuencia = 0;
@@ -58,7 +61,8 @@ public class Cliente {
                     while (siguienteSecuencia < totalPaquetes) {
                         // Envío de paquetes en la ventana actual
                         for (int i = base; i < Math.min(base + TAMANO_VENTANA, totalPaquetes); i++) {
-                            bs = createPacketData(i, archivoSeleccionado, fis, totalPaquetes);
+                            FileInputStream auxfis = new FileInputStream(archivoSeleccionado);
+                            bs = createPacketData(i, archivoSeleccionado, auxfis, totalPaquetes);
                             DatagramPacket paqueteEnvio = new DatagramPacket(bs, bs.length, dst, pto);
                             cl.send(paqueteEnvio);
                             siguienteSecuencia++;
@@ -83,6 +87,8 @@ public class Cliente {
                                 // Timeout, retransmitir paquetes no confirmados
                                 System.out.println("entro en retroceder n \n");
                                 i = base - 1; // Retroceder para retransmitir
+                                siguienteSecuencia = i;
+                                break;
                             }
                         }
                     }
@@ -92,20 +98,20 @@ public class Cliente {
                     DatagramPacket paqueteEnvio = new DatagramPacket(bs, bs.length, dst, pto);
                     cl.send(paqueteEnvio);
                     fis.close();
-                    
+                    cl.close();
                 } else {
                     // El cliente decide no enviar más archivos
                     break;
                 }
             } // while
-            cl.close();
         } catch (Exception e) {
             e.printStackTrace();
         }//catch
     }
     private static byte[] createPacketData(int sequenceNumber, File file, FileInputStream fis, int total) throws IOException {
         int offset = (sequenceNumber) * 1024;
-        System.out.println("salto:" + offset + "\n");
+        if(offset >= 0) fis.skip(offset);
+        //System.out.println("salto:" + offset + "\n");
         //if(offset != 0) fis.skip(1024);
         //System.out.println("disponible:" + fis.available() + "\n");
         int length;
@@ -116,7 +122,7 @@ public class Cliente {
         } else {
             length = (int) file.length() % 1024;
         }
-        System.out.println("tamm paquete a enviar:" + length + "\n");
+       // System.out.println("tamm paquete a enviar:" + length + "\n");
         byte[] packetData = new byte[length + 4];
         byte[] sequenceBytes = intToBytes(sequenceNumber);
         System.arraycopy(sequenceBytes, 0, packetData, 0, 4);

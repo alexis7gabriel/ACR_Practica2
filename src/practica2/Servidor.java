@@ -6,12 +6,15 @@ package practica2;
 
 import java.io.*;
 import java.net.*;
+import java.util.Random;
 
 /**
  *
  * @author cesar
  */
 public class Servidor {
+    
+    private static final double RANGO = 0.95; // 3 segundos de timeout
 
     public static void main(String[] args) throws InterruptedException {
         try {
@@ -39,12 +42,26 @@ public class Servidor {
                     byte[] bufferRecepcion = new byte[200000];
                     DatagramPacket paqueteRecepcion = new DatagramPacket(bufferRecepcion, bufferRecepcion.length);
                     socketServidor.receive(paqueteRecepcion);
-                    System.out.println("ack: " + extractSequenceNumber(paqueteRecepcion.getData()) + "\n");
+                    System.out.println("ack esperado: " + expectedSequenceNumber + "  ack recibido: " + extractSequenceNumber(paqueteRecepcion.getData()) + "\n");
                     if (extractSequenceNumber(paqueteRecepcion.getData())== expectedSequenceNumber) {
-                        // Procesamiento del paquete
-                        processPacket(paqueteRecepcion, fos);
-                        // Incrementa el número de secuencia esperado para el siguiente paquete
-                        expectedSequenceNumber++;
+                        
+                        // Generar un número aleatorio entre 0 y 1
+                        Random random = new Random();
+                        double randomValue = random.nextDouble();
+
+                        // Enviar un ACK si el valor aleatorio es menor que el umbral
+                        if (randomValue > RANGO) {
+                            // Esperar 3 segundos para el client no recibir ack
+                            System.out.println("No enviar ack \n");
+                            Thread.sleep(1005); // Retraso de 3 segundos
+                            
+                        } else {
+                            // Procesamiento del paquete
+
+                            processPacket(paqueteRecepcion, fos);
+                            // Incrementa el número de secuencia esperado para el siguiente paquete
+                            expectedSequenceNumber++;
+                        }
                     } else if (extractSequenceNumber(paqueteRecepcion.getData())== -1){
                         System.out.println("Fin del archivo \n");
                         break;
@@ -63,7 +80,7 @@ public class Servidor {
         // Obtener datos del paquete
         byte[] data = packet.getData();
         int length = packet.getLength();
-        System.out.println("tamaño: " + length + "\n");
+        //System.out.println("tamaño: " + length + "\n");
         // Escribir datos al archivo
         fos.write(data, 4, length - 4); // Excluye los primeros 4 bytes (número de secuencia)
     }
